@@ -150,12 +150,14 @@ ${TEST_NAMES}:
 	@grep --no-filename --no-messages 'ISIM:' $@.{v,vhd} | cut -d: -f2 > build/isim_$@.cmd
 	@echo "run all" >> build/isim_$@.cmd
 	cd build ; ./isim_$@$(EXE) -tclbatch isim_$@.cmd ;
+	if grep -q ERROR build/$@.error; then vcd build/$@.vcd ; exit 1; fi
 
 buildtest: ${TEST_EXES}
 
 build/isim_%$(EXE): build/$(PROJECT)_sim.prj $(VSOURCE) $(VHDSOURCE) ${VTEST} $(VHDTEST)
 	$(call RUN,fuse) $(COMMON_OPTS) $(FUSE_OPTS) \
 	    -prj $(PROJECT)_sim.prj \
+	    -d test=$* -d vcd=$*.vcd \
 	    -o isim_$*$(EXE) \
 	    work.$* work.glbl
 
