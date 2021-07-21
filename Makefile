@@ -74,7 +74,7 @@ VHDTEST = $(foreach file,$(wildcard *$(TEST_POSTFIX).vhd),$(file))
 TEST_NAMES = $(foreach file,$(VTEST) $(VHDTEST),$(basename $(file)))
 TEST_EXES = $(foreach test,$(TEST_NAMES),build/isim_$(test)$(EXE))
 
-RUN = @echo -ne "\n\n\e[1;33m======== $(1) ========\e[m\n\n"; \
+RUN = @echo "\n\e[1;33m$(shell date +"%Y-%m-%d %T"): ======== $(1) ========\e[m\n"; \
 	cd build && $(XILINX)/bin/$(XILINX_PLATFORM)/$(1)
 
 # isim executables don't work without this
@@ -117,6 +117,8 @@ build/$(PROJECT).scr: project.cfg
 	    "-p $(TARGET_PART)" \
 	    > build/$(PROJECT).scr
 
+		
+# make FPGA: xst -> ngdbuild -> map -> par -> bitgen
 $(BITFILE): project.cfg $(VSOURCE) $(CONSTRAINTS) build/$(PROJECT).prj build/$(PROJECT).scr
 	@mkdir -p build
 	$(call RUN,xst) $(COMMON_OPTS) \
@@ -131,7 +133,40 @@ $(BITFILE): project.cfg $(VSOURCE) $(CONSTRAINTS) build/$(PROJECT).prj build/$(P
 	    -w $(PROJECT).map.ncd $(PROJECT).ncd $(PROJECT).pcf
 	$(call RUN,bitgen) $(COMMON_OPTS) $(BITGEN_OPTS) \
 	    -w $(PROJECT).ncd $(PROJECT).bit
-	@echo -ne "\e[1;32m======== OK ========\e[m\n"
+	@echo "\n\e[1;32m$(shell date +"%Y-%m-%d %T"): ======== OK ========\e[m"
+
+
+# make CPLD: xst -> ngdbuild -> cpldfit -> hprep6
+cpld: project.cfg $(VSOURCE) $(CONSTRAINTS) build/$(PROJECT).prj build/$(PROJECT).scr
+	@mkdir -p  build/  build/xst/  build/ngdbuild/  build/cpldfit/  build/hprep6/
+
+# input the HDL sources, output an NGC; move all files to xst/
+	$(call RUN,xst) $(COMMON_OPTS) \
+	    -ifn $(PROJECT).scr
+	@find build/ -maxdepth 1 -type f -print0 | xargs -0 mv -t build/xst/
+
+# input the NGC and the UCF, output a NGD
+	$(call RUN,ngdbuild) $(COMMON_OPTS) $(NGDBUILD_OPTS) -p $(TARGET_PART) \
+		-uc ../$(CONSTRAINTS) \
+	    xst/$(PROJECT).ngc \
+		ngdbuild/$(PROJECT).ngd
+	@find build/ -maxdepth 1 -type f -print0 | xargs -0 mv -t build/ngdbuild/
+	@mv -f build/xlnx_auto_0_xdb/ build/ngdbuild/
+
+# input the NGD, output a VM6 (UG628 p.277)
+	$(call RUN,cpldfit) $(COMMON_OPTS) \
+	    -p $(TARGET_PART) \
+	    ngdbuild/$(PROJECT).ngd
+	@find build/ -maxdepth 1 -type f -print0 | xargs -0 mv -t build/cpldfit/
+
+# input the VM6, output a JED (UG628 p.291)
+	$(call RUN,hprep6) -i cpldfit/$(PROJECT).vm6
+	@find build/ -maxdepth 1 -type f -print0 | xargs -0 mv -t build/hprep6/
+#	@echo "\e[1;32m======== OK ========\e[m\n"
+	@cp build/hprep6/$(PROJECT).jed ./build/$(PROJECT).jed
+	@echo "\n\e[1;32m$(shell date +"%Y-%m-%d %T"): ======== OK ========\e[m"
+	@echo "CPLD build output at ./build/$(PROJECT).jed \n"
+
 
 
 ###########################################################################

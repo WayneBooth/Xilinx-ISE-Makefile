@@ -137,7 +137,11 @@ The Xilinx ISE Makefile implements the following targets:
 
   * `make default` (or just `make`)
 
-    Builds the bitstream.
+    Builds a FPGA bitstream (xst -> ngdbuild -> map -> par -> bitgen).
+
+  * `make cpld`
+
+    Builds a CPLD JEDEC (xst -> ngdbuild -> cpldfit -> hprep6).
 
   * `make test`
 
@@ -149,8 +153,9 @@ The Xilinx ISE Makefile implements the following targets:
 
   * `make prog`
 
-    Writes the bitstream to a target device. Requires some additional
+    Writes a FPGA bitstream to a target device. Requires some additional
     configuration; see below for details.
+    Note: CPLD JEDEC programming has not been tested
 
 
 Running unit tests
@@ -177,7 +182,7 @@ encouraged!)
 
   * Generation of SPI or other unusual programming files
 
-  * CPLD synthesis
+  * CPLD programming
 
   * Synthesis tools other than XST
 
